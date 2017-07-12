@@ -47,14 +47,32 @@ def trainPiece(model,pieces,epochs,start=0):
     def signal_handler(signame, sf):
         stopflag[0] = True
     old_handler = signal.signal(signal.SIGINT, signal_handler)
-    for i in range(start,start+epochs):
-        if stopflag[0]:
-            break
-        error = model.update_fun(*getPieceBatch(pieces))
-        if i % 100 == 0:
+    try:
+        for i in range(start,start+epochs):
+            if stopflag[0]:
+                break
+            error = model.update_fun(*getPieceBatch(pieces))
+            # Print every epoch
             print "epoch {}, error={}".format(i,error)
-        if i % 500 == 0 or (i % 100 == 0 and i < 1000):
+            # While i < 1000, save every 100 epoch. Afterwards, save every 500
+            # if i % 500 == 0 or (i % 100 == 0 and i < 1000):
+            # Instead, save every 100 epoch always
+            if i % 100 == 0:
+                lastCheck = i
+                xIpt, xOpt = map(numpy.array, getPieceSegment(pieces))
+                noteStateMatrixToMidi(numpy.concatenate((numpy.expand_dims(xOpt[0], 0), model.predict_fun(batch_len, 1, xIpt[0])), axis=0),'output/sample{}'.format(i))
+                pickle.dump(model.learned_config,open('output/params{}.p'.format(i), 'wb'))
+                print("Model saved.")
+    
+    except KeyboardInterrupt:
+        # Introduce a line break after ^C is displayed
+        print()
+
+    finally: 
+        if i > lastCheck:
             xIpt, xOpt = map(numpy.array, getPieceSegment(pieces))
             noteStateMatrixToMidi(numpy.concatenate((numpy.expand_dims(xOpt[0], 0), model.predict_fun(batch_len, 1, xIpt[0])), axis=0),'output/sample{}'.format(i))
             pickle.dump(model.learned_config,open('output/params{}.p'.format(i), 'wb'))
+            print("Model saved. Exiting.")
+
     signal.signal(signal.SIGINT, old_handler)
